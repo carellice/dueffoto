@@ -47,6 +47,7 @@ import androidx.compose.material.icons.rounded.FlashOff
 import androidx.compose.material.icons.rounded.FlashOn
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -169,10 +170,19 @@ private fun Viewfinder(studio: Studio) {
     live[0] = film
     live[1] = Develop(strength = studio.strength, ratio = studio.ratio, number = shots.size % 36 + 1)
     var seed by remember { mutableIntStateOf(0) }
+    // La scena in piccolo, per le anteprime dei rullini: si aggiorna poco più di una volta al secondo.
+    var scene by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var sceneAt by remember { mutableLongStateOf(0L) }
+    var tools by remember { mutableStateOf(false) }
     DisposableEffect(rig) {
         rig.onFrame = { bmp ->
             val f = live[0] as Film?
             val o = (live[1] as Develop).copy(seed = seed++)
+            val now = System.currentTimeMillis()
+            if (now - sceneAt > 900) {
+                sceneAt = now
+                scene = thumbSource(bmp)
+            }
             val out = Darkroom.develop(bmp, f, o)
             bmp.recycle()
             frame = out.asImageBitmap()
@@ -301,7 +311,7 @@ private fun Viewfinder(studio: Studio) {
                 frame?.let {
                     Image(it, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
                 } ?: Text("…", style = Type.title.copy(color = Ink.faint))
-                if (film?.kind == Kind.CINEMA || studio.kind == Kind.CINEMA) CinemaHud(studio, recording, elapsed)
+                if (studio.kind == Kind.CINEMA) CinemaHud(studio, recording, elapsed)
                 else if (film?.frame == null || film.frame == Frame.NONE) FilmEdge(film)
                 focus?.let { FocusMark(it, focusTick) }
                 Box(Modifier.fillMaxSize().alpha(blink.value).background(Color.Black))
@@ -311,52 +321,73 @@ private fun Viewfinder(studio: Studio) {
             }
         }
 
-        // Interruttori: analogico/cinema e foto/video.
+        // Il selettore del modo, con la manopola delle regolazioni accanto.
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Switch(listOf(Kind.ANALOG to "ANALOGICO", Kind.CINEMA to "CINEMA"), studio.kind, {
+            Switch(Kind.entries.map { it to it.label }, studio.kind, {
                 if (!recording) {
                     studio.kind = it
                     studio.remember()
                 }
-            })
-            Switch(listOf(false to "FOTO", true to "VIDEO"), studio.video, { if (!recording) studio.video = it })
+            }, Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
+            RoundButton({ tools = !tools }, size = 38.dp) {
+                Icon(Icons.Rounded.Tune, "Regolazioni", tint = if (tools || ev != 0f) Ink.orange else Ink.dim, modifier = Modifier.size(18.dp))
+            }
+        }
+        AnimatedVisibility(tools) {
+            Column {
+                if (studio.kind == Kind.CINEMA) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Ratio.entries.forEach { r ->
+                            Chip(r.label, studio.ratio == r) {
+                                studio.ratio = r
+                                studio.remember()
+                            }
+                        }
+                    }
+                }
+                Dial(
+                    "EV", ev, -2f..2f, (if (ev >= 0) "+" else "") + "%.1f".format(ev),
+                    {
+                        ev = (it * 3).roundToInt() / 3f
+                        rig.setExposure(ev)
+                    },
+                    Modifier.padding(horizontal = 16.dp),
+                    bipolar = true,
+                )
+                Dial(
+                    "DOSE", studio.strength, 0f..1f, "${(studio.strength * 100).roundToInt()}%",
+                    {
+                        studio.strength = it
+                        studio.remember()
+                    },
+                    Modifier.padding(horizontal = 16.dp),
+                )
+            }
         }
 
-        if (studio.kind == Kind.CINEMA) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Ratio.entries.forEach { r ->
-                    Chip(r.label, studio.ratio == r) {
-                        studio.ratio = r
-                        studio.remember()
-                    }
+        FilmPicker(studio.kind, film, scene) { studio.choose(it) }
+
+        // Foto o video, come sulle fotocamere: due parole sopra lo scatto.
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.Center) {
+            listOf(false to "FOTO", true to "VIDEO").forEach { (v, label) ->
+                val on = studio.video == v
+                Column(
+                    Modifier.press({ if (!recording) studio.video = v }).padding(horizontal = 14.dp, vertical = 2.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(label, style = Type.label.copy(color = if (on) Ink.orange else Ink.faint, fontWeight = FontWeight.Bold, letterSpacing = 3.sp))
+                    Box(Modifier.padding(top = 3.dp).size(4.dp).clip(RoundedCornerShape(50)).background(if (on) Ink.orange else Color.Transparent))
                 }
             }
         }
-        Dial(
-            "EV", ev, -2f..2f, (if (ev >= 0) "+" else "") + "%.1f".format(ev),
-            {
-                ev = (it * 3).roundToInt() / 3f
-                rig.setExposure(ev)
-            },
-            Modifier.padding(horizontal = 16.dp),
-            bipolar = true,
-        )
-        if (studio.kind == Kind.CINEMA) {
-            Dial(
-                "GRADE", studio.strength, 0f..1f, "${(studio.strength * 100).roundToInt()}%",
-                { studio.strength = it }, Modifier.padding(horizontal = 16.dp),
-            )
-        }
-
-        FilmPicker(studio.kind, film) { studio.choose(it) }
 
         // Comandi: rullino, scatto, fotocamera frontale.
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 10.dp),
+            Modifier.fillMaxWidth().padding(start = 28.dp, end = 28.dp, top = 2.dp, bottom = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -374,30 +405,6 @@ private fun Viewfinder(studio: Studio) {
             }
         }
         LabBar(studio)
-    }
-}
-
-@Composable
-fun FilmPicker(kind: Kind, selected: Film?, later: Boolean = true, onPick: (Film?) -> Unit) {
-    val films = if (kind == Kind.ANALOG) Films.analog else Films.cinema
-    val list = (if (later) listOf<Film?>(null) else emptyList()) + films
-    val state = rememberLazyListState()
-    LaunchedEffect(kind) {
-        val i = list.indexOf(selected).coerceAtLeast(0)
-        state.scrollToItem((i - 1).coerceAtLeast(0))
-    }
-    Column {
-        LazyRow(state = state, contentPadding = PaddingValues(horizontal = 10.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            items(list, key = { it?.id ?: "later" }) { f ->
-                Canister(f, f == selected) { onPick(f) }
-            }
-        }
-        Text(
-            selected?.let { "${it.year} · ${it.note}" } ?: "Scatti al naturale, la pellicola la scegli dopo in camera oscura.",
-            style = Type.body.copy(fontSize = 13.sp), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 2.dp),
-            textAlign = TextAlign.Center,
-        )
     }
 }
 
@@ -447,7 +454,10 @@ private fun CinemaHud(studio: Studio, recording: Boolean, elapsed: Long) {
 private fun FilmEdge(film: Film?) {
     Box(Modifier.fillMaxSize().padding(12.dp)) {
         Text(
-            film?.let { "${it.stock.uppercase()}  ▸  ISO ${it.iso}" } ?: "NEGATIVO  ▸  SCEGLI DOPO",
+            film?.let {
+                if (it.kind == Kind.MOODY) "${it.camera.uppercase()}  ▸  ${it.year.uppercase()}"
+                else "${it.stock.uppercase()}  ▸  ISO ${it.iso}"
+            } ?: "NEGATIVO  ▸  SCEGLI DOPO",
             style = Type.label.copy(color = Ink.orange, fontWeight = FontWeight.Bold, fontSize = 9.sp),
             modifier = Modifier.align(Alignment.BottomStart),
         )

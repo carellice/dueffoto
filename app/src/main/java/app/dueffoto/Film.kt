@@ -2,8 +2,17 @@ package app.dueffoto
 
 import kotlin.math.pow
 
-/** Analogico: emula una fotocamera con la sua pellicola. Cinema: un look da color grading moderno. */
-enum class Kind { ANALOG, CINEMA }
+/**
+ * Analogico: emula una fotocamera con la sua pellicola. Moody: il look scuro e cinematografico delle foto
+ * da telefono "fatte bene". Cinema: color grading da pellicola cinematografica.
+ */
+enum class Kind(val label: String) { ANALOG("ANALOGICO"), MOODY("MOODY"), CINEMA("CINEMA") }
+
+/** Scaffali del frigo: come si raggruppano le pellicole nella scelta. */
+enum class Family(val label: String) {
+    COLOR("Colore"), BW("Bianco e nero"), SLIDE("Diapositive"), INSTANT("Istantanee"), LOMO("Sperimentali"),
+    MOODY("Moody"), CINEMA("Cinema"),
+}
 
 /** Come esce la stampa: senza bordo, istantanea, formato quadrato o con il bordo della pellicola. */
 enum class Frame { NONE, INSTANT, INSTAX, SQUARE, REBATE }
@@ -46,7 +55,30 @@ data class Film(
     val date: Boolean = false,
     /** Rapporto del lato lungo sul corto, null = come la fotocamera. */
     val aspect: Float? = null,
-)
+    /** Ombre chiuse: schiaccia i neri senza toccare le luci (0..1.5). */
+    val toe: Float = 0f,
+    /** Saturazione residua nelle ombre profonde (1 = come il resto). */
+    val shadowSat: Float = 1f,
+    /** Verdi spenti verso l'oliva (0..1). */
+    val greens: Float = 0f,
+    /** Blu di cieli e mare verso un ottanio grigio (0..1). */
+    val blues: Float = 0f,
+    val mids: Tint = Tint(),
+) {
+    val family: Family
+        get() = when {
+            kind == Kind.MOODY -> Family.MOODY
+            kind == Kind.CINEMA -> Family.CINEMA
+            bw -> Family.BW
+            frame == Frame.INSTANT || frame == Frame.INSTAX -> Family.INSTANT
+            id in setOf("x700", "ql17") -> Family.SLIDE
+            id in setOf("lca", "holga", "pop", "purple", "zenit") -> Family.LOMO
+            else -> Family.COLOR
+        }
+
+    /** L'illustrazione del rullino (o della scatola, della latta, del filtro). */
+    val art: Int get() = Films.art(id)
+}
 
 /** Le bobine disponibili, nell'ordine in cui compaiono. */
 object Films {
@@ -195,6 +227,117 @@ object Films {
             contrast = 0.05f, bw = true, shadows = Tint(0.03f, 0.01f, -0.02f), highlights = Tint(0.06f, 0.03f, -0.04f),
             fade = 0.12f, roll = 0.1f, grain = 0.5f, vignette = 0.6f, frame = Frame.SQUARE,
         ),
+        Film(
+            "mju2", Kind.ANALOG, "Olympus µ-II", "Fujicolor C200", "1997",
+            "La compatta tascabile degli anni '90: verdi freschi, flash sempre pronto.",
+            Triple(0xFF6FA84A, 0xFFF2F2EA, 0xFF1C5C2E), iso = 200,
+            contrast = 0.2f, saturation = 1.0f, warmth = -0.1f, tint = -0.1f,
+            shadows = Tint(-0.02f, 0.02f, 0.02f), highlights = Tint(0.01f, 0.01f, 0.0f),
+            fade = 0.03f, grain = 0.35f, vignette = 0.3f,
+        ),
+        Film(
+            "gr1", Kind.ANALOG, "Ricoh GR1", "Agfa Vista 200", "1996",
+            "Rossi pieni e bianchi puliti: la compatta dei fotografi di strada.",
+            Triple(0xFFF2EEE6, 0xFFD52B2B, 0xFF1A1A1A), iso = 200,
+            contrast = 0.25f, saturation = 1.15f, warmth = 0.25f, tint = 0.08f,
+            highlights = Tint(0.03f, 0.0f, -0.03f), grain = 0.3f, vignette = 0.2f,
+        ),
+        Film(
+            "sureshot", Kind.ANALOG, "Canon Sure Shot", "Kodak Ultramax 400", "1979",
+            "Caldo, saturo, indistruttibile: la pellicola di tutti i compleanni.",
+            Triple(0xFF1C3A7A, 0xFFF2C21B, 0xFF0E1A3A),
+            contrast = 0.25f, saturation = 1.15f, warmth = 0.4f,
+            shadows = Tint(0.0f, 0.01f, 0.02f), highlights = Tint(0.03f, 0.02f, -0.04f),
+            fade = 0.02f, grain = 0.4f, vignette = 0.25f,
+        ),
+        Film(
+            "f3", Kind.ANALOG, "Nikon F3", "Ilford Delta 3200", "1980",
+            "Bianco e nero da notte: grana enorme, neri morbidi, luce che non c'è.",
+            Triple(0xFF151515, 0xFFF0F0F0, 0xFFE8642C), iso = 3200,
+            exposure = 0.1f, contrast = 0.2f, bw = true, fade = 0.06f, grain = 0.95f, vignette = 0.3f,
+        ),
+        Film(
+            "rz67", Kind.ANALOG, "Mamiya RZ67", "Kodak Portra 160 (120)", "1982",
+            "Medio formato 6×7: pelle perfetta, pastelli e una nitidezza da studio.",
+            Triple(0xFFF2EEE6, 0xFFE07B1F, 0xFF1C2F5A), iso = 160,
+            contrast = -0.1f, saturation = 0.9f, warmth = 0.2f,
+            shadows = Tint(0.0f, 0.01f, 0.02f), highlights = Tint(0.02f, 0.01f, -0.02f),
+            fade = 0.04f, roll = 0.03f, grain = 0.12f, vignette = 0.1f, aspect = 7f / 6f,
+        ),
+        Film(
+            "purple", Kind.ANALOG, "LOMO LC-Wide", "LomoChrome Purple", "2013",
+            "I verdi diventano viola, il cielo turchese: un altro pianeta.",
+            Triple(0xFF4B1F6E, 0xFFC9A2E8, 0xFF1A0A2A),
+            contrast = 0.25f, saturation = 1.1f, tint = 0.5f,
+            shadows = Tint(0.05f, -0.03f, 0.06f), highlights = Tint(0.02f, -0.02f, 0.04f),
+            grain = 0.4f, vignette = 0.5f, greens = 1f,
+        ),
+        Film(
+            "pentax17", Kind.ANALOG, "Pentax 17", "Harman Phoenix 200", "2024",
+            "Mezzo formato verticale, rossi accesi e aloni: la pellicola ribelle.",
+            Triple(0xFFD2401E, 0xFFF0E2C8, 0xFF2A1A0A), iso = 200,
+            contrast = 0.35f, saturation = 1.1f, warmth = 0.3f, tint = 0.1f,
+            highlights = Tint(0.06f, 0.0f, -0.03f), grain = 0.55f, vignette = 0.3f, leak = 0.15f, aspect = 1.5f,
+        ),
+        Film(
+            "colorplus", Kind.ANALOG, "Minolta Riva", "Kodak ColorPlus 200", "1988",
+            "Economica e calda, un po' slavata: le estati in spiaggia.",
+            Triple(0xFFF2C21B, 0xFFE8642C, 0xFF2A1A0A), iso = 200,
+            saturation = 0.9f, warmth = 0.45f, shadows = Tint(0.02f, 0.01f, -0.01f),
+            fade = 0.05f, roll = 0.03f, grain = 0.4f, vignette = 0.3f, date = true,
+        ),
+    )
+
+    /** Il look delle foto da telefono "cinematiche": calibrato su foto di riferimento (tools/calibrate.py). */
+    val moody = listOf(
+        Film(
+            "dusk", Kind.MOODY, "Dusk", "Strade al tramonto", "Crepuscolo",
+            "Cielo grigio ottanio, nuvole color pesca, asfalto che sparisce nel buio.",
+            Triple(0xFF4F6E73, 0xFFF2A07A, 0xFF101010),
+            exposure = -0.1f, contrast = 0.15f, saturation = 0.5f, warmth = 0.3f, toe = 0.9f, roll = 0.3f, shadowSat = 0.6f,
+            greens = 0.5f, blues = 0.9f, shadows = Tint(-0.03f, -0.01f, 0f), mids = Tint(0.03f, 0.01f, -0.04f),
+            highlights = Tint(0.12f, 0.01f, -0.12f), grain = 0.12f, vignette = 0.2f,
+        ),
+        Film(
+            "oak", Kind.MOODY, "Oak Shade", "Ombra dorata", "Sottobosco",
+            "Ombre profonde, foglie oliva e lame di luce dorata.",
+            Triple(0xFF3A3020, 0xFFE8B04A, 0xFF101010),
+            exposure = -0.6f, contrast = 0.15f, saturation = 0.5f, warmth = 0.45f, toe = 1.1f, roll = 0.3f, shadowSat = 0.6f,
+            greens = 1f, blues = 0.7f, shadows = Tint(-0.02f, -0.015f, -0.02f), mids = Tint(0.01f, 0.005f, -0.02f),
+            highlights = Tint(0.13f, 0.07f, -0.09f), grain = 0.12f, vignette = 0.25f,
+        ),
+        Film(
+            "canyon", Kind.MOODY, "Canyon", "Colline bruciate", "Ora d'oro",
+            "Terra arancione, ombre che tagliano, cielo azzurro polvere.",
+            Triple(0xFFB5542A, 0xFF5FB3B8, 0xFF101010),
+            exposure = -0.2f, contrast = 0.15f, saturation = 0.75f, warmth = 0.4f, tint = 0.05f, toe = 0.9f, roll = 0.3f,
+            shadowSat = 0.6f, greens = 0.7f, blues = 0.4f, shadows = Tint(-0.02f, 0f, 0.02f), mids = Tint(0.01f, 0.005f, -0.02f),
+            highlights = Tint(0.12f, 0.03f, -0.12f), grain = 0.12f, vignette = 0.2f,
+        ),
+        Film(
+            "lastlight", Kind.MOODY, "Last Light", "Ultima luce", "Blu notte",
+            "Tutto è sagoma tranne una riga arancione all'orizzonte.",
+            Triple(0xFF141C2E, 0xFFF08A2C, 0xFF0A0A0A),
+            exposure = -0.5f, contrast = 0.35f, saturation = 0.5f, toe = 1.2f, roll = 0.3f, shadowSat = 0.6f,
+            greens = 0.5f, blues = 0.7f, shadows = Tint(-0.02f, 0f, 0.015f), mids = Tint(0.01f, 0.005f, -0.02f),
+            highlights = Tint(0.15f, 0.04f, -0.12f), grain = 0.15f, vignette = 0.3f,
+        ),
+        Film(
+            "tealroom", Kind.MOODY, "Teal Room", "Luce di finestra", "Interni",
+            "Pareti ottanio, pelle calda, il sole che entra di taglio.",
+            Triple(0xFF1F4E4A, 0xFFE0A050, 0xFF101010),
+            exposure = -0.2f, contrast = 0.15f, saturation = 0.6f, warmth = 0.15f, tint = -0.05f, toe = 0.9f, roll = 0.3f,
+            shadowSat = 0.6f, greens = 0.25f, blues = 0.9f, shadows = Tint(-0.03f, 0.012f, 0f), mids = Tint(-0.035f, 0.02f, -0.015f),
+            highlights = Tint(0.08f, 0.04f, -0.10f), grain = 0.12f, vignette = 0.2f,
+        ),
+        Film(
+            "coast", Kind.MOODY, "Coastline", "Costa d'autunno", "Mare",
+            "Mare d'ardesia, cielo verde acqua, orizzonte color crema.",
+            Triple(0xFF4A6E80, 0xFFF0DFC0, 0xFF101010),
+            exposure = -0.15f, contrast = 0.15f, saturation = 0.42f, warmth = 0.1f, toe = 0.8f, roll = 0.32f, shadowSat = 0.6f,
+            greens = 0.7f, blues = 0.8f, shadows = Tint(-0.03f, -0.01f, 0f), mids = Tint(-0.04f, 0.005f, -0.01f),
+            highlights = Tint(0.12f, 0.05f, -0.10f), grain = 0.1f, vignette = 0.2f,
+        ),
     )
 
     val cinema = listOf(
@@ -215,7 +358,7 @@ object Films {
             roll = 0.03f, grain = 0.1f, vignette = 0.2f,
         ),
         Film(
-            "moody", Kind.CINEMA, "Moody", "Kodak 2383 Print", "Indie",
+            "moody", Kind.CINEMA, "Indie Print", "Kodak 2383 Print", "Indie",
             "Desaturato e scuro, ombre fredde, luci color crema.",
             Triple(0xFF2B3A3F, 0xFFC9B48A, 0xFF101010),
             exposure = -0.25f, contrast = 0.2f, saturation = 0.72f, warmth = 0.05f,
@@ -259,11 +402,87 @@ object Films {
             shadows = Tint(0.03f, 0.02f, 0.04f), highlights = Tint(0.02f, 0.0f, 0.0f),
             fade = 0.1f, roll = 0.03f, grain = 0.08f, vignette = 0.1f,
         ),
+        Film(
+            "vision500", Kind.CINEMA, "Neon Night", "Kodak Vision3 500T", "Notte",
+            "Tungsteno di notte: lampioni con l'alone rosso, ombre blu petrolio.",
+            Triple(0xFF1A1F3A, 0xFFC8102E, 0xFF2F6BB3), iso = 500,
+            contrast = 0.2f, saturation = 0.95f, warmth = -0.5f, toe = 0.3f,
+            shadows = Tint(-0.02f, 0.02f, 0.05f), highlights = Tint(0.07f, 0.01f, -0.01f),
+            roll = 0.04f, grain = 0.3f, vignette = 0.3f,
+        ),
+        Film(
+            "techni", Kind.CINEMA, "Tre Strisce", "Technicolor", "Hollywood '50",
+            "Colori densi come vernice: rossi da musical e cieli da cartolina.",
+            Triple(0xFFF2C21B, 0xFFC8102E, 0xFF1D3F8C),
+            contrast = 0.35f, saturation = 1.35f, warmth = 0.15f,
+            shadows = Tint(0f, 0f, 0.03f), highlights = Tint(0.03f, 0.01f, -0.02f), grain = 0.15f, vignette = 0.25f,
+        ),
+        Film(
+            "super8", Kind.CINEMA, "Super 8", "Kodachrome 40 (S8)", "Anni '70",
+            "Il filmino delle vacanze: caldo, sgranato, con la luce che entra dai bordi.",
+            Triple(0xFFF2C21B, 0xFF1A1A1A, 0xFFE8642C), iso = 40,
+            contrast = 0.2f, saturation = 1.05f, warmth = 0.35f, fade = 0.06f, roll = 0.08f,
+            grain = 0.6f, vignette = 0.55f, leak = 0.2f, aspect = 4f / 3f,
+        ),
     )
 
-    val all = analog + cinema
+    val all = analog + moody + cinema
 
     fun byId(id: String?): Film? = all.firstOrNull { it.id == id }
+
+    fun of(kind: Kind) = when (kind) {
+        Kind.ANALOG -> analog
+        Kind.MOODY -> moody
+        Kind.CINEMA -> cinema
+    }
+
+    fun art(id: String): Int = when (id) {
+        "trip35" -> R.drawable.film_trip35
+        "ae1" -> R.drawable.film_ae1
+        "fm2" -> R.drawable.film_fm2
+        "m6" -> R.drawable.film_m6
+        "sx70" -> R.drawable.film_sx70
+        "p600" -> R.drawable.film_p600
+        "instax" -> R.drawable.film_instax
+        "instamatic" -> R.drawable.film_instamatic
+        "lca" -> R.drawable.film_lca
+        "holga" -> R.drawable.film_holga
+        "t4" -> R.drawable.film_t4
+        "k1000" -> R.drawable.film_k1000
+        "t2" -> R.drawable.film_t2
+        "funsaver" -> R.drawable.film_funsaver
+        "x700" -> R.drawable.film_x700
+        "ql17" -> R.drawable.film_ql17
+        "pop" -> R.drawable.film_pop
+        "zenit" -> R.drawable.film_zenit
+        "brownie" -> R.drawable.film_brownie
+        "mju2" -> R.drawable.film_mju2
+        "gr1" -> R.drawable.film_gr1
+        "sureshot" -> R.drawable.film_sureshot
+        "f3" -> R.drawable.film_f3
+        "rz67" -> R.drawable.film_rz67
+        "purple" -> R.drawable.film_purple
+        "pentax17" -> R.drawable.film_pentax17
+        "colorplus" -> R.drawable.film_colorplus
+        "dusk" -> R.drawable.film_dusk
+        "oak" -> R.drawable.film_oak
+        "canyon" -> R.drawable.film_canyon
+        "lastlight" -> R.drawable.film_lastlight
+        "tealroom" -> R.drawable.film_tealroom
+        "coast" -> R.drawable.film_coast
+        "golden" -> R.drawable.film_golden
+        "teal" -> R.drawable.film_teal
+        "moody" -> R.drawable.film_moody
+        "bleach" -> R.drawable.film_bleach
+        "noir" -> R.drawable.film_noir
+        "night" -> R.drawable.film_night
+        "matrix" -> R.drawable.film_matrix
+        "pastel" -> R.drawable.film_pastel
+        "vision500" -> R.drawable.film_vision500
+        "techni" -> R.drawable.film_techni
+        "super8" -> R.drawable.film_super8
+        else -> R.drawable.film_trip35
+    }
 }
 
 /** Rapporti d'aspetto per il cinema (lato lungo / lato corto). */
@@ -284,6 +503,7 @@ class Grade(private val film: Film, private val strength: Float = 1f) {
     private val gGain = 1f - 0.06f * film.tint
     private val bGain = 1f - 0.14f * film.warmth + 0.03f * film.tint
     private val k = film.contrast
+    private val toe = film.toe
     private val span = 1f - film.fade - film.roll
 
     fun apply(r0: Float, g0: Float, b0: Float, out: FloatArray) {
@@ -297,16 +517,28 @@ class Grade(private val film: Film, private val strength: Float = 1f) {
             r = m; g = m; b = m
             l = m
         } else {
-            val s = film.saturation
+            // Le ombre profonde perdono colore prima del resto, come sulla pellicola.
+            val s = film.saturation * (film.shadowSat + (1f - film.shadowSat) * smooth(0.03f, 0.4f, l))
             r = l + (r - l) * s; g = l + (g - l) * s; b = l + (b - l) * s
+            if (film.greens > 0f) {
+                val gx = (g - maxOf(r, b)).coerceAtLeast(0f)
+                g -= film.greens * gx * 0.8f
+                r += film.greens * gx * 0.3f
+            }
+            if (film.blues > 0f) {
+                val bx = (b - maxOf(r, g)).coerceAtLeast(0f)
+                b -= film.blues * bx * 0.6f
+                g += film.blues * bx * 0.35f
+            }
         }
         r = curve(r); g = curve(g); b = curve(b)
         l = (0.2126f * r + 0.7152f * g + 0.0722f * b).coerceIn(0f, 1f)
         val sw = (1f - l) * (1f - l)
         val hw = l * l
-        r += film.shadows.r * sw + film.highlights.r * hw
-        g += film.shadows.g * sw + film.highlights.g * hw
-        b += film.shadows.b * sw + film.highlights.b * hw
+        val mw = 1f - sw - hw
+        r += film.shadows.r * sw + film.mids.r * mw + film.highlights.r * hw
+        g += film.shadows.g * sw + film.mids.g * mw + film.highlights.g * hw
+        b += film.shadows.b * sw + film.mids.b * mw + film.highlights.b * hw
         r = film.fade + r.coerceIn(0f, 1f) * span
         g = film.fade + g.coerceIn(0f, 1f) * span
         b = film.fade + b.coerceIn(0f, 1f) * span
@@ -321,7 +553,15 @@ class Grade(private val film: Film, private val strength: Float = 1f) {
         // Spalla: le alte luci bruciate rientrano dolcemente invece di tagliarsi.
         if (x > 0.8f) x = 0.8f + (1f - 1f / (1f + (x - 0.8f) * 5f)) * 0.2f
         x = x.coerceAtMost(1f)
-        return if (k >= 0f) x + (x * x * (3f - 2f * x) - x) * k
+        x = if (k >= 0f) x + (x * x * (3f - 2f * x) - x) * k
         else 0.5f + (x - 0.5f) * (1f + k)
+        x = x.coerceIn(0f, 1f)
+        // Piede: i neri si chiudono, le luci restano dove sono.
+        return if (toe > 0f) x.pow(1f + toe * (1f - x)) else x
+    }
+
+    private fun smooth(e0: Float, e1: Float, x: Float): Float {
+        val t = ((x - e0) / (e1 - e0)).coerceIn(0f, 1f)
+        return t * t * (3f - 2f * t)
     }
 }

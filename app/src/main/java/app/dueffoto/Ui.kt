@@ -138,10 +138,11 @@ fun <T> Switch(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Uni
             val bg by animateColorAsState(if (on) Ink.chrome else Color.Transparent, label = "switch")
             Box(
                 Modifier
+                    .weight(1f)
                     .clip(RoundedCornerShape(50))
                     .background(bg)
                     .clickable { onSelect(value) }
-                    .padding(horizontal = 14.dp, vertical = 7.dp),
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(label, style = Type.label.copy(color = if (on) Ink.body else Ink.dim, fontWeight = FontWeight.Bold))
@@ -179,82 +180,6 @@ fun Dial(label: String, value: Float, range: ClosedFloatingPointRange<Float>, di
             ),
         )
         Text(display, style = Type.label.copy(color = Ink.cream), textAlign = TextAlign.End, modifier = Modifier.width(44.dp))
-    }
-}
-
-/** Il rullino della pellicola, disegnato: corpo colorato, coperchi cromati e la linguetta che esce. */
-@Composable
-fun Canister(film: Film?, selected: Boolean, onClick: () -> Unit) {
-    val lift by animateFloatAsState(if (selected) 1f else 0f, spring(Spring.DampingRatioMediumBouncy), label = "lift")
-    Column(
-        Modifier
-            .width(96.dp)
-            .press(onClick)
-            .padding(vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier
-                .size(width = 86.dp, height = 92.dp)
-                .padding(top = (10 - 10 * lift).coerceIn(0f, 10f).dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Canvas(Modifier.fillMaxSize()) {
-                if (selected) {
-                    drawCircle(Brush.radialGradient(listOf(Ink.orange.copy(alpha = 0.35f), Color.Transparent)), radius = size.minDimension * 0.62f)
-                }
-                drawCanister(film)
-            }
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            film?.camera ?: "Scegli dopo", style = Type.name.copy(fontSize = 13.sp, color = if (selected) Ink.cream else Ink.dim),
-            maxLines = 2, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            (film?.stock ?: "camera oscura").uppercase(),
-            style = Type.label.copy(fontSize = 8.sp, letterSpacing = 0.8.sp, color = if (selected) Ink.orange else Ink.faint),
-            maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
-        )
-    }
-}
-
-private fun DrawScope.drawCanister(film: Film?) {
-    val (bodyC, bandC, inkC) = film?.canister?.let { Triple(Color(it.first), Color(it.second), Color(it.third)) }
-        ?: Triple(Ink.panel, Ink.leather, Ink.dim)
-    val w = size.width * 0.5f
-    val h = size.height * 0.62f
-    val left = size.width * 0.12f
-    val top = (size.height - h) / 2f
-    // Linguetta della pellicola con le perforazioni.
-    val tongueTop = top + h * 0.3f
-    val tongueH = h * 0.42f
-    drawRoundRect(Color(0xFF3A2414), Offset(left + w * 0.6f, tongueTop), Size(size.width * 0.78f - w * 0.6f, tongueH), CornerRadius(3f))
-    var x = left + w + 4f
-    while (x < size.width * 0.84f) {
-        drawRect(Color(0xFF0E0906), Offset(x, tongueTop + 3f), Size(4f, 4f))
-        drawRect(Color(0xFF0E0906), Offset(x, tongueTop + tongueH - 7f), Size(4f, 4f))
-        x += 9f
-    }
-    // Coperchi cromati sopra e sotto.
-    val cap = Brush.horizontalGradient(listOf(Ink.chromeDark, Ink.chrome, Color.White, Ink.chrome, Ink.chromeDark), startX = left, endX = left + w)
-    drawRoundRect(cap, Offset(left + w * 0.06f, top - 7f), Size(w * 0.88f, 9f), CornerRadius(3f))
-    drawRoundRect(cap, Offset(left + w * 0.06f, top + h - 2f), Size(w * 0.88f, 9f), CornerRadius(3f))
-    drawRoundRect(cap, Offset(left + w * 0.34f, top - 13f), Size(w * 0.32f, 7f), CornerRadius(2f))
-    // Corpo cilindrico: colore pieno con riflesso e ombra laterale.
-    drawRoundRect(bodyC, Offset(left, top), Size(w, h), CornerRadius(4f))
-    drawRect(bandC, Offset(left, top + h * 0.38f), Size(w, h * 0.26f))
-    drawRect(inkC.copy(alpha = 0.9f), Offset(left + w * 0.18f, top + h * 0.47f), Size(w * 0.64f, h * 0.035f))
-    drawRect(inkC.copy(alpha = 0.6f), Offset(left + w * 0.18f, top + h * 0.53f), Size(w * 0.4f, h * 0.025f))
-    drawRoundRect(
-        Brush.horizontalGradient(
-            listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent, Color.White.copy(alpha = 0.28f), Color.Transparent, Color.Black.copy(alpha = 0.55f)),
-            startX = left, endX = left + w,
-        ),
-        Offset(left, top), Size(w, h), CornerRadius(4f),
-    )
-    if (film == null) {
-        drawCircle(Ink.dim, radius = w * 0.16f, center = Offset(left + w / 2f, top + h * 0.2f), style = Stroke(2f))
     }
 }
 

@@ -48,7 +48,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -143,7 +145,8 @@ fun DarkroomScreen(studio: Studio, shotId: Long) {
         return
     }
     var kind by remember { mutableStateOf(shot.film?.kind ?: studio.kind) }
-    var film by remember { mutableStateOf(shot.film ?: if (kind == Kind.ANALOG) Films.analog.first() else Films.cinema.first()) }
+    var film by remember { mutableStateOf(shot.film ?: Films.of(kind).first()) }
+    var showOriginal by remember { mutableStateOf(false) }
     var strength by remember { mutableStateOf(shot.strength) }
     var ratio by remember { mutableStateOf(shot.ratio) }
     var grain by remember { mutableStateOf(true) }
@@ -153,6 +156,8 @@ fun DarkroomScreen(studio: Studio, shotId: Long) {
     var confirmDelete by remember { mutableStateOf(false) }
 
     val base by produceState<Bitmap?>(null, shot.id) { value = studio.roll.original(shot, 1400) }
+    val scene = remember(base) { base?.let { thumbSource(it) } }
+    val original = remember(base) { base?.asImageBitmap() }
     val opts = Develop(strength, ratio, (shot.id % 997).toInt(), grain = grain && !shot.video, frame = frame && !shot.video)
     val preview by produceState<ImageBitmap?>(null, base, film, opts) {
         val b = base ?: return@produceState
@@ -181,8 +186,24 @@ fun DarkroomScreen(studio: Studio, shotId: Long) {
                 .clip(RoundedCornerShape(18.dp)).background(Color(0xFF080706)),
             contentAlignment = Alignment.Center,
         ) {
-            preview?.let { Image(it, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(10.dp)) }
-                ?: CircularProgressIndicator(color = Ink.orange)
+            val shown = if (showOriginal) original else preview
+            shown?.let {
+                Image(
+                    it, null, contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().padding(10.dp).pointerInput(Unit) {
+                        detectTapGestures(onPress = {
+                            showOriginal = true
+                            tryAwaitRelease()
+                            showOriginal = false
+                        })
+                    },
+                )
+            } ?: CircularProgressIndicator(color = Ink.orange)
+            Text(
+                if (showOriginal) "ORIGINALE" else "TIENI PREMUTO PER L'ORIGINALE",
+                style = Type.label.copy(color = if (showOriginal) Ink.amber else Ink.faint, fontSize = 8.sp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),
+            )
             if (shot.video) {
                 Text(
                     "VIDEO · ANTEPRIMA DEL PRIMO FOTOGRAMMA", style = Type.label.copy(color = Ink.amber, fontSize = 9.sp),
@@ -194,23 +215,30 @@ fun DarkroomScreen(studio: Studio, shotId: Long) {
             Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
-            Switch(listOf(Kind.ANALOG to "ANALOGICO", Kind.CINEMA to "CINEMA"), kind, {
+            Switch(Kind.entries.map { it to it.label }, kind, {
                 kind = it
-                film = if (it == Kind.ANALOG) Films.analog.first() else Films.cinema.first()
-            })
-            Spacer(Modifier.weight(1f))
-            if (!shot.video) {
-                Chip("GRANA", grain) { grain = !grain }
-                Chip("CORNICE", frame) { frame = !frame }
-            }
+                film = Films.of(it).first()
+            }, Modifier.fillMaxWidth())
         }
         if (kind == Kind.CINEMA) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Ratio.entries.forEach { r -> Chip(r.label, ratio == r) { ratio = r } }
             }
         }
-        Dial("DOSE", strength, 0f..1f, "${(strength * 100).roundToInt()}%", { strength = it }, Modifier.padding(horizontal = 16.dp))
-        FilmPickerNoLater(kind, film) { film = it }
+        Row(Modifier.fillMaxWidth().padding(end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Dial("DOSE", strength, 0f..1f, "${(strength * 100).roundToInt()}%", { strength = it }, Modifier.weight(1f).padding(start = 16.dp, end = 4.dp))
+            if (!shot.video) {
+                Chip("GRANA", grain) { grain = !grain }
+                Spacer(Modifier.width(6.dp))
+                Chip("BORDO", frame) { frame = !frame }
+            }
+        }
+        FilmPicker(kind, film, scene, later = false) {
+            it?.let { f ->
+                kind = f.kind
+                film = f
+            }
+        }
 
         val developing = shot.video && studio.lab != null
         Box(
@@ -260,12 +288,6 @@ fun DarkroomScreen(studio: Studio, shotId: Long) {
             dismissButton = { TextButton({ confirmDelete = false }) { Text("ANNULLA", style = Type.label.copy(color = Ink.cream)) } },
         )
     }
-}
-
-/** In camera oscura si sceglie sempre una pellicola: niente "Scegli dopo". */
-@Composable
-private fun FilmPickerNoLater(kind: Kind, selected: Film, onPick: (Film) -> Unit) {
-    FilmPicker(kind, selected, later = false) { it?.let(onPick) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

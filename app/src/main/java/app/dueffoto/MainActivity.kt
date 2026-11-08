@@ -40,6 +40,7 @@ class Studio(private val context: Context, private val scope: CoroutineScope) {
     var kind by mutableStateOf(runCatching { Kind.valueOf(prefs.getString("kind", "")!!) }.getOrDefault(Kind.ANALOG))
     var analogFilm by mutableStateOf(pick(prefs.getString("analog", "trip35"), Films.analog.first()))
     var cinemaFilm by mutableStateOf(pick(prefs.getString("cinema", "golden"), Films.cinema.first()))
+    var moodyFilm by mutableStateOf(pick(prefs.getString("moody", "dusk"), Films.moody.first()))
     var ratio by mutableStateOf(runCatching { Ratio.valueOf(prefs.getString("ratio", "")!!) }.getOrDefault(Ratio.HD))
     var strength by mutableStateOf(prefs.getFloat("strength", 1f))
     var video by mutableStateOf(false)
@@ -50,7 +51,12 @@ class Studio(private val context: Context, private val scope: CoroutineScope) {
     var lab by mutableStateOf<Float?>(null)
     var toast by mutableStateOf<String?>(null)
 
-    val film: Film? get() = if (kind == Kind.ANALOG) analogFilm else cinemaFilm
+    val film: Film?
+        get() = when (kind) {
+            Kind.ANALOG -> analogFilm
+            Kind.MOODY -> moodyFilm
+            Kind.CINEMA -> cinemaFilm
+        }
 
     /** "Scegli dopo" è salvato come stringa vuota. */
     private fun pick(id: String?, default: Film): Film? = if (id == "") null else Films.byId(id) ?: default
@@ -60,13 +66,20 @@ class Studio(private val context: Context, private val scope: CoroutineScope) {
             .putString("kind", kind.name)
             .putString("analog", analogFilm?.id ?: "")
             .putString("cinema", cinemaFilm?.id ?: "")
+            .putString("moody", moodyFilm?.id ?: "")
             .putString("ratio", ratio.name)
             .putFloat("strength", strength)
             .apply()
     }
 
+    /** Sceglie la pellicola; se viene da un altro scaffale del frigo, cambia anche il modo. */
     fun choose(film: Film?) {
-        if (kind == Kind.ANALOG) analogFilm = film else cinemaFilm = film
+        if (film != null) kind = film.kind
+        when (kind) {
+            Kind.ANALOG -> analogFilm = film
+            Kind.MOODY -> moodyFilm = film
+            Kind.CINEMA -> cinemaFilm = film
+        }
         remember()
     }
 
