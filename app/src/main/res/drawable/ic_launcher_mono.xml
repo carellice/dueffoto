@@ -1,11 +1,13 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Obiettivo: ghiera, lente e riflesso. -->
-    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="4"
-        android:pathData="M54,30 A24,24 0 1,1 53.99,30 Z" />
-    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="3"
-        android:pathData="M54,39 A15,15 0 1,1 53.99,39 Z" />
+    <!-- Diaframma, come nell'icona a colori: ghiera, anello e foro esagonale. -->
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="5"
+        android:pathData="M54,29 A25,25 0 1,1 53.99,29 Z" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.5"
+        android:pathData="M54,37 A17,17 0 1,1 53.99,37 Z" />
     <path android:fillColor="#FFFFFFFF"
-        android:pathData="M48,48 A6,6 0 1,1 47.99,48 Z" />
+        android:pathData="M47,54 L50.5,48 L57.5,48 L61,54 L57.5,60 L50.5,60 Z" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M63,41 A2,2 0 1,1 62.99,41 Z" />
 </vector>
